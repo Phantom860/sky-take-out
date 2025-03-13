@@ -7,7 +7,4 @@ sky:
     username: root
     password: 3271149877mm
   alioss:
-    endpoint: oss-cn-guangzhou.aliyuncs.com
-    access-key-id: LTAI5tMufTGJrzdKePzKoq9G
-    access-key-secret: hbbkwPdulLXRCONvnbVcK8Q3nAuRUc
-    bucket-name: skyprogram
+

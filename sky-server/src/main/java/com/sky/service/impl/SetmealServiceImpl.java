@@ -1,12 +1,20 @@
 package com.sky.service.impl;
 
+import com.github.pagehelper.Page;
+import com.github.pagehelper.PageHelper;
+import com.sky.constant.MessageConstant;
+import com.sky.constant.StatusConstant;
 import com.sky.dto.SetmealDTO;
+import com.sky.dto.SetmealPageQueryDTO;
 import com.sky.entity.Setmeal;
 import com.sky.entity.SetmealDish;
+import com.sky.exception.DeletionNotAllowedException;
 import com.sky.mapper.DishMapper;
 import com.sky.mapper.SetmealDishMapper;
 import com.sky.mapper.SetmealMapper;
+import com.sky.result.PageResult;
 import com.sky.service.SetmealService;
+import com.sky.vo.SetmealVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,4 +70,53 @@ public class SetmealServiceImpl implements SetmealService {
         //保存套餐和菜品的关联关系  动态sql批量插入
         setmealDishMapper.insertBatch(setmealDishes);
     }
+
+    /**
+     * 分页查询
+     * @param setmealPageQueryDTO
+     * @return
+     */
+    @Override
+    public PageResult pageQuery(SetmealPageQueryDTO setmealPageQueryDTO) {
+        int pageNum = setmealPageQueryDTO.getPage();
+        int pageSize = setmealPageQueryDTO.getPageSize();
+
+        //需要在查询功能之前开启分页功能：当前页的页码   每页显示的条数
+        PageHelper.startPage(pageNum, pageSize);
+        //这个方法有返回值为Page对象，里面保存的是分页之后的相关数据
+        Page<SetmealVO> page = setmealMapper.pageQuery(setmealPageQueryDTO);
+        //封装到PageResult中:总记录数  当前页数据集合
+        return new PageResult(page.getTotal(), page.getResult());
+    }
+
+    /**
+     * 批量删除套餐
+     * @param ids
+     */
+    @Transactional
+    @Override
+    public void deleteBatch(List<Long> ids) {
+        //判断当前套餐是否能够删除---是否存在起售中的套餐？？
+        //思路：遍历获取传入的id，根据id查询套餐setmeal中的status字段，0 停售 1 起售，
+        //    如果是1代表是起售状态不能删除
+        ids.forEach(id -> {
+            Setmeal setmeal = setmealMapper.getById(id);
+            if(StatusConstant.ENABLE == setmeal.getStatus()){
+                //起售中的套餐不能删除
+                throw new DeletionNotAllowedException(MessageConstant.SETMEAL_ON_SALE);
+            }
+        });
+
+
+        //思路：套餐表和菜品表是多对多关系，把整个套餐都删除了，那么关系表中保存的套餐对应
+        //     的菜品关系就没有意义了，所以此时也应该删除关系表中的数据。
+        ids.forEach(setmealId -> {
+            //删除套餐表中的数据
+            setmealMapper.deleteById(setmealId);
+            //删除套餐菜品关系表中的数据
+            setmealDishMapper.deleteBySetmealId(setmealId);
+        });
+    }
+
+
 }
